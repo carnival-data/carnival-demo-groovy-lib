@@ -1,0 +1,131 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        mavenLocal()
+    }
+    dependencies {
+        classpath group:'org.carnival', name:'carnival-gradle', version:'2.1.1-SNAPSHOT'
+    }    
+}
+
+
+plugins {
+    // Apply the groovy Plugin to add support for Groovy.
+    id 'groovy'
+
+    // Apply the java-library plugin for API and implementation separation.
+    id 'java-library'
+
+    id 'maven-publish'
+    id 'com.github.ManifestClasspath' version '0.1.0-RELEASE'
+}
+apply plugin: 'carnival.library'
+
+version "0.1-SNAPSHOT"
+group "org.carnival"
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    // use Spock for testing
+    testImplementation 'org.spockframework:spock-core:2.0-M4-groovy-3.0'
+}
+
+tasks.named('test') {
+    // Use junit platform for unit tests.
+    useJUnitPlatform()
+}
+
+java {
+    sourceCompatibility = JavaVersion.toVersion('11')
+    targetCompatibility = JavaVersion.toVersion('11')
+}
+
+test {
+    testLogging {
+        outputs.upToDateWhen {false}
+        showStandardStreams = true
+    }
+}
+
+groovydoc {
+    classpath = sourceSets.main.runtimeClasspath + classpath
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// maven publishing
+///////////////////////////////////////////////////////////////////////////////
+publishToMavenLocal.dependsOn 'compileGroovy'
+
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/augustearth/carnival-monday")
+            credentials {
+                username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_USER")
+                password = project.findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allJava
+    from sourceSets.main.allGroovy
+    classifier = 'sources'
+}
+
+task javadocJar(type: Jar) {
+    from javadoc
+    from groovydoc
+    classifier = 'javadoc'
+}
+
+publishing {
+    publications {
+        mavenGroovy(MavenPublication) {
+            artifactId = 'carnival-demo-groovy-lib'
+            from components.java
+            artifact sourcesJar
+            artifact javadocJar
+            pom.withXml {
+                asNode().children().last() + {
+                    resolveStrategy = Closure.DELEGATE_FIRST
+                    name 'Carnival Demo Library'
+                    description 'Demonstration Carnival library.'
+                    url 'https://github.com/carnival-data/carnival-demo-groovy-lib'
+                    licenses {
+                        license {
+                            name 'GNU GENERAL PUBLIC LICENSE, Version 3, 29 June 2007'
+                            url 'https://www.gnu.org/licenses/gpl-3.0.txt'
+                        }
+                    }
+                    developers {
+						developer {
+                            id 'augustearth'
+                            name 'David Birtwell'
+                            email 'augustearth@gmail.com'
+                        }
+                    }
+                    scm {
+                        connection 'scm:git:git://github.com:carnival-data/carnival-demo-groovy-lib.git'
+                        developerConnection 'scm:git:ssh://github.com:carnival-data/carnival-demo-groovy-lib.git'
+                        url 'https://github.com/carnival-data/carnival-demo-groovy-lib'
+                    }
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            // change URLs to point to your repos, e.g. http://my.org/repo
+            def releasesRepoUrl = "$buildDir/repos/releases"
+            def snapshotsRepoUrl = "$buildDir/repos/snapshots"
+            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+        }
+    }
+}
